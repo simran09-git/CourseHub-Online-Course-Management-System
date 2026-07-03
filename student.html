@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>CourseHub Student</title>
+
+<style>
+body{
+margin:0;
+font-family:Segoe UI;
+background:
+linear-gradient(rgba(0,0,0,.6),rgba(0,0,0,.6)),
+url("https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1920");
+background-size:cover;
+color:white;
+}
+
+header{
+display:flex;
+justify-content:space-between;
+padding:15px 30px;
+background:#111;
+}
+
+button{
+padding:8px 15px;
+border:none;
+border-radius:20px;
+cursor:pointer;
+margin:5px;
+}
+
+.categoryBar{
+text-align:center;
+padding:10px;
+}
+
+.categoryBar button{
+background:#ff4081;
+color:white;
+}
+
+.grid{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+gap:20px;
+padding:20px;
+}
+
+.card{
+background:rgba(255,255,255,.1);
+padding:15px;
+border-radius:10px;
+text-align:center;
+}
+
+.card img{
+height:60px;
+margin-bottom:10px;
+}
+
+.enrollBtn{
+background:#00c853;
+color:white;
+}
+
+.progressBtn{
+background:#2196f3;
+color:white;
+}
+
+.section{
+display:none;
+}
+
+.active{
+display:block;
+}
+
+input{
+padding:8px;
+width:80%;
+border-radius:8px;
+border:none;
+margin-top:5px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<h2> Student Dashboard</h2>
+<div>
+<button onclick="showSection('courses')">Courses</button>
+<button onclick="showSection('profile')">Profile</button>
+<button onclick="logout()">Logout</button>
+</div>
+</header>
+
+<!-- COURSES SECTION -->
+<div class="section active" id="courses">
+
+<div class="categoryBar">
+<button onclick="loadCourses('All')">All</button>
+<button onclick="loadCourses('Programming')">Programming</button>
+<button onclick="loadCourses('Business')">Business</button>
+<button onclick="loadCourses('Designing')">Designing</button>
+<button onclick="loadCourses('Marketing')">Marketing</button>
+</div>
+
+<div id="courseList" class="grid"></div>
+
+</div>
+
+<!-- PROFILE SECTION -->
+<div id="profile" class="section">
+<div class="card">
+<h2>Profile</h2>
+
+<p><b>Email:</b> <span id="pEmail"></span></p>
+
+<hr>
+
+<h3>Update Profile</h3>
+
+<input id="pName" placeholder="Enter New Name"><br><br>
+<input id="pEmailInput" placeholder="Enter New Email"><br><br>
+
+<button onclick="updateProfile()" class="enrollBtn">
+Update Profile
+</button>
+
+<hr>
+
+<h3>Enrolled Courses & Progress</h3>
+<div id="profileCourses"></div>
+</div>
+</div>
+
+<script>
+
+// 🔒 LOGIN CHECK
+let email = localStorage.getItem("userEmail");
+
+if(!email){
+alert("Login first");
+location.href="login.html";
+}
+
+// ================= LOAD COURSES =================
+async function loadCourses(category="All"){
+
+let url = "http://localhost:3000/api/courses";
+
+if(category !== "All"){
+url += `?cat=${category}`;
+}
+
+let res = await fetch(url);
+let courses = await res.json();
+
+document.getElementById("courseList").innerHTML="";
+
+courses.forEach(c=>{
+document.getElementById("courseList").innerHTML+=`
+<div class="card">
+<img src="${c.logo}">
+<h3>${c.title}</h3>
+<p>${c.cat}</p>
+<button class="enrollBtn" onclick="enroll(${c.id})">
+Enroll
+</button>
+</div>`;
+});
+}
+
+// ================= ENROLL =================
+async function enroll(id){
+
+let res = await fetch("http://localhost:3000/api/enroll",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({email,courseId:id})
+});
+
+let data = await res.json();
+
+if(data.success){
+alert("Enrolled Successfully");
+}else{
+alert(data.message);
+}
+}
+
+// ================= LOAD PROFILE =================
+async function loadProfile(){
+
+document.getElementById("pEmail").innerText = email;
+
+try {
+let resUser = await fetch(`http://localhost:3000/api/user/${email}`);
+let user = await resUser.json();
+
+pName.value = user && user.name ? user.name : "";
+pEmailInput.value = user && user.email ? user.email : email;
+
+} catch(err){
+pName.value = "";
+pEmailInput.value = email;
+}
+
+let res = await fetch(`http://localhost:3000/api/enrollments/${email}`);
+let courses = await res.json();
+
+document.getElementById("profileCourses").innerHTML="";
+
+courses.forEach(c=>{
+document.getElementById("profileCourses").innerHTML+=`
+<div>
+${c.title} - ${c.progress}%
+
+${c.progress >= 100
+? `<span style="color:lightgreen;font-weight:bold;">✔ Course Completed</span>`
+: `<button class="progressBtn" onclick="increaseProgress(${c.id})">Increase Progress</button>`}
+
+</div>`;
+});
+}
+
+// ================= INCREASE PROGRESS =================
+async function increaseProgress(id){
+
+await fetch("http://localhost:3000/api/progress",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({email,courseId:id})
+});
+
+loadProfile();
+}
+
+// ================= UPDATE PROFILE =================
+async function updateProfile(){
+
+let oldEmail = localStorage.getItem("userEmail");
+
+await fetch("http://localhost:3000/api/updateUser",{
+method:"PUT",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+oldEmail: oldEmail,
+newName: pName.value,
+newEmail: pEmailInput.value
+})
+});
+
+localStorage.setItem("userEmail", pEmailInput.value);
+email = pEmailInput.value;
+
+alert("Profile Updated Successfully");
+loadProfile();
+}
+
+// ================= SECTION SWITCH =================
+function showSection(id){
+
+document.querySelectorAll(".section")
+.forEach(s=>s.classList.remove("active"));
+
+document.getElementById(id)
+.classList.add("active");
+
+if(id==="profile") loadProfile();
+}
+
+// ================= LOGOUT =================
+function logout(){
+localStorage.removeItem("userEmail");
+localStorage.removeItem("userRole");
+location.href="login.html";
+}
+
+// Initial Load
+loadCourses();
+
+</script>
+
+</body>
+</html>

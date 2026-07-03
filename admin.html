@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>CourseHub Admin Dashboard</title>
+
+<style>
+body{
+margin:0;
+font-family:Segoe UI;
+background:
+linear-gradient(rgba(0,0,0,.7),rgba(0,0,0,.7)),
+url("https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1920");
+background-size:cover;
+color:white;
+}
+
+header{
+display:flex;
+justify-content:space-between;
+background:#111;
+padding:15px 30px;
+}
+
+button{
+padding:8px 15px;
+border:none;
+border-radius:20px;
+cursor:pointer;
+margin:5px;
+}
+
+.section{
+display:none;
+padding:20px;
+}
+
+.active{
+display:block;
+}
+
+.card{
+background:rgba(255,255,255,.1);
+padding:15px;
+border-radius:10px;
+margin:10px;
+}
+
+.card img{
+height:50px;
+}
+
+.deleteBtn{
+background:red;
+color:white;
+}
+
+.addBtn{
+background:#00c853;
+color:white;
+}
+
+.categoryBar{
+text-align:center;
+margin-bottom:10px;
+}
+</style>
+</head>
+
+<body>
+
+<script>
+
+// 🔒 LOGIN CHECK
+let role = localStorage.getItem("userRole");
+
+if(role!=="admin"){
+alert("Admin login required");
+location.href="login.html";
+}
+
+// ================= SECTION SWITCH =================
+function showSection(id){
+
+document.querySelectorAll(".section")
+.forEach(s=>s.classList.remove("active"));
+
+document.getElementById(id)
+.classList.add("active");
+
+if(id==="students") loadStudents();
+if(id==="courses") loadCourses();
+if(id==="enrollments") loadEnrollments();
+
+}
+
+// ================= LOAD STUDENTS =================
+async function loadStudents(){
+
+let res = await fetch("http://localhost:3000/api/users");
+let users = await res.json();
+
+document.getElementById("studentList").innerHTML="";
+
+users.forEach(u=>{
+
+document.getElementById("studentList").innerHTML+=`
+<div class="card">
+<h3>${u.name}</h3>
+<p>Email: ${u.email}</p>
+<button class="deleteBtn"
+onclick="deleteStudent('${u.email}')">
+Delete Student
+</button>
+</div>
+`;
+
+});
+
+}
+
+// ================= DELETE STUDENT =================
+async function deleteStudent(email){
+
+await fetch(`http://localhost:3000/api/user/${email}`,{
+method:"DELETE"
+});
+
+loadStudents();
+
+}
+
+// ================= LOAD COURSES =================
+async function loadCourses(category="All"){
+
+let url = "http://localhost:3000/api/courses";
+
+if(category !== "All"){
+url += `?cat=${category}`;
+}
+
+let res = await fetch(url);
+let courses = await res.json();
+
+document.getElementById("courseList").innerHTML="";
+
+courses.forEach(c=>{
+
+document.getElementById("courseList").innerHTML+=`
+<div class="card">
+<img src="${c.logo}">
+<h3>${c.title}</h3>
+<p>${c.cat}</p>
+<button class="deleteBtn"
+onclick="deleteCourse(${c.id})">
+Delete
+</button>
+</div>
+`;
+
+});
+
+}
+
+// ================= ADD COURSE =================
+async function addCourse(){
+
+await fetch("http://localhost:3000/api/courses",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+title:cTitle.value,
+cat:cCat.value,
+logo:cLogo.value
+})
+});
+
+cTitle.value="";
+cCat.value="";
+cLogo.value="";
+
+loadCourses();
+
+}
+
+// ================= DELETE COURSE =================
+async function deleteCourse(id){
+
+await fetch(`http://localhost:3000/api/course/${id}`,{
+method:"DELETE"
+});
+
+loadCourses();
+
+}
+
+// ================= LOAD ENROLLMENTS =================
+async function loadEnrollments(){
+
+let res = await fetch("http://localhost:3000/api/enrollments");
+let enrollments = await res.json();
+
+document.getElementById("enrollmentList").innerHTML="";
+
+enrollments.forEach(e=>{
+
+document.getElementById("enrollmentList").innerHTML+=`
+<div class="card">
+Student: ${e.name}<br>
+Course: ${e.title}<br>
+Progress: ${e.progress}%<br>
+<button class="deleteBtn"
+onclick="removeEnrollment('${e.email}',${e.courseId})">
+Remove
+</button>
+</div>
+`;
+
+});
+
+}
+
+// ================= REMOVE ENROLLMENT =================
+async function removeEnrollment(email,courseId){
+
+await fetch("http://localhost:3000/api/removeEnrollment",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({email,courseId})
+});
+
+loadEnrollments();
+
+}
+
+// ================= LOGOUT =================
+function logout(){
+localStorage.removeItem("userEmail");
+localStorage.removeItem("userRole");
+location.href="login.html";
+}
+
+</script>
+
+<header>
+<h2>⚙️ Admin Dashboard</h2>
+<div>
+<button onclick="showSection('students')">Students</button>
+<button onclick="showSection('courses')">Courses</button>
+<button onclick="showSection('enrollments')">Enrollments</button>
+<button onclick="logout()">Logout</button>
+</div>
+</header>
+
+<!-- STUDENTS -->
+<div id="students" class="section active">
+<h2>Students</h2>
+<div id="studentList"></div>
+</div>
+
+<!-- COURSES -->
+<div id="courses" class="section">
+
+<div class="categoryBar">
+<button onclick="loadCourses('All')">All</button>
+<button onclick="loadCourses('Programming')">Programming</button>
+<button onclick="loadCourses('Business')">Business</button>
+<button onclick="loadCourses('Designing')">Designing</button>
+<button onclick="loadCourses('Marketing')">Marketing</button>
+</div>
+
+<h2>Add Course</h2>
+<input id="cTitle" placeholder="Course Title">
+<input id="cCat" placeholder="Category">
+<input id="cLogo" placeholder="Logo URL">
+<button class="addBtn" onclick="addCourse()">Add Course</button>
+
+<h2>All Courses</h2>
+<div id="courseList"></div>
+</div>
+
+<!-- ENROLLMENTS -->
+<div id="enrollments" class="section">
+<h2>Enrollments</h2>
+<div id="enrollmentList"></div>
+</div>
+
+<script>
+loadStudents();
+</script>
+
+</body>
+</html>
